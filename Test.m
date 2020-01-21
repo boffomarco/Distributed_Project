@@ -1,92 +1,120 @@
 clear all;
 clc;
 
-
-
-C = imread("Density100.png");
-imshow(C);
-
-BW = rgb2gray(C);
-figure,imshow(BW)
-
-num = 3;
+num = 20;
 dim = 100;
-lloydsAlgorithm(BW,num, dim, dim*rand(num,1),dim*rand(num,1), [0,0;0,dim;dim,dim;dim,0], 200, true)
+R = 50;
+lloydsAlgorithm(R,num, dim, dim*rand(num,1)/10+dim/2,dim*rand(num,1)/10+dim/2, [0,0;0,dim;dim,dim;dim,0], 200, true,false)
 
+function [Cx,Cy] = CoreAlgorithm(BW,index,Px,Py,R,dim)
 
+minX = min(0,Px(index)-R);
+maxX = max(dim,Px(index)+R);
+minY = min(0,Py(index)-R);
+maxY = max(dim,Py(index)+R);
 
-function [Cx,Cy] = PolyCentroid(BW, X,Y)
+VorX = [Px(index)];
+VorY = [Py(index)];
+for z=1:numel(Px)
+    if (((Px(z)-Px(index))^2 + (Py(z)-Py(index))^2)^(1/2) < R) && z ~= index
+        VorX = [VorX; Px(z)];
+        VorY = [VorY; Py(z)];
+    end
+end
+
+crs = [minX,minY;minX,maxY;maxX,maxY;maxX,minY];
+[v,c]=VoronoiBounded(VorX,VorY, crs);
+
+cumX = 0;
+totX = 0;
+cumY = 0;
+totY = 0;
+
+cumXT = 0;
+totXT = 0;
+cumYT = 0;
+totYT = 0;
+for x=minX:1.0:maxX
+    for y=minY:1.0:maxY
+        if  uint64(x)>0 &&  uint64(x)<=100 &&  uint64(y)>0 &&  uint64(y)<=dim
+            [in,on] = inpolygon(x,y,v(c{1},1),v(c{1},2));                          % Logical Matrix
+            inon = in | on;                                          % Combine ‘in’ And ‘on’
+            if(inon)
+                if ((Px(index)-x)^2 + (Py(index)-y))^(1/2) < R
+                    totX = totX + ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
+                    totY = totY + ((dim - ((Py(index)-y)^2)^(1/2)))^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
+                    cumX = cumX + (x) * ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
+                    cumY = cumY + (y) * ((dim - ((Py(index)-y)^2)^(1/2)))^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
+                end
+
+                totXT = totXT + ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
+                totYT = totYT + ((dim - ((Py(index)-y)^2)^(1/2)))^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
+                cumXT = cumXT + (x) * ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
+                cumYT = cumYT + (y) * ((dim - ((Py(index)-y)^2)^(1/2)))^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
+            end
+        end
+    end
+end
+Cx = (cumX/(totX));
+Cy = (cumY/(totY));
+
+Cxt = (cumXT/(totXT));
+Cyt = (cumYT/(totYT));
+
+Cx = (Cx+Cxt)/2;
+Cy = (Cy+Cyt)/2;
+
+end
+
+function [Cx,Cy] = PolyCentroid(BW,Xcrs,Ycrs, X,Y, dim)
 % POLYCENTROID returns the coordinates for the centroid of polygon with vertices X,Y
 % The centroid of a non-self-intersecting closed polygon defined by n vertices (x0,y0), (x1,y1), ..., (xn?1,yn?1) is the point (Cx, Cy), where
 % In these formulas, the vertices are assumed to be numbered in order of their occurrence along the polygon's perimeter, and the vertex ( xn, yn ) is assumed to be the same as ( x0, y0 ). Note that if the points are numbered in clockwise order the area A, computed as above, will have a negative sign; but the centroid coordinates will be correct even in this case.http://en.wikipedia.org/wiki/Centroid
 % A = polyarea(X,Y)
-cumX = 0;
-cumY = 0;
-count = 0;
-tot = 0;
-
-%{
-xq = zeros(1,10000);                                           % Random X-Coordinates
-yq = zeros(1,10000);                                           % Random Y-Coordinates
-for i=1:10000
-    xq(i) = idivide(int16(i),100);
-    yq(i) = rem( i , 100 );
-end
-
-
-[in,on] = inpolygon(xq,yq,  X, Y);                          % Logical Matrix
-inon = in | on;        
-
-idx = find(inon(:));                                        % Linear Indices Of ‘inon’ Points
-xcoord = xq(idx);                                           % X-Coordinates Of ‘inon’ Points
-ycoord = yq(idx);                                           % Y-Coordinates Of ‘inon’ Points
-figure(1)
-plot(xq, yq, 'bp')                                          % Plot All Points
-hold on
-plot(X, Y, '-r')                                          % Plot Polygon
-plot(xcoord, ycoord, 'gp')                                  % Overplot ‘inon’ Points
-hold off
-%}
-for i=1:1.0:100
-
-    for j=1:1.0:100
-        
-
-        [in,on] = inpolygon(i,j, X,Y);                          % Logical Matrix
+cumX1 = 0;
+cumY1 = 0;
+totX1 = 0;
+totY1 = 0;
+cumX2 = 0;
+cumY2 = 0;
+totX2 = 0;
+totY2 = 0;
+for i=1:1.0:dim
+    for j=1:1.0:dim
+        [in,on] = inpolygon(i,j, Xcrs,Ycrs);                          % Logical Matrix
         inon = in | on;                                          % Combine ‘in’ And ‘on’
         if(inon)
-            count = count + 1;
-            tot = tot + uint64(BW(i,j)+1);
-            cumX = cumX + (i) * uint64(BW(i,j) + 1);
-            cumY = cumY + (j) * uint64(BW(i,j) + 1);
+            totX1 = totX1 + ((dim - ((X-i)^2)^(1/2)) )^2 * uint64(BW(i,j)+1)^2;
+            totY1 = totY1 + ((dim - ((Y-j)^2)^(1/2)))^2 * uint64(BW(i,j)+1)^2;
+            cumX1 = cumX1 + (i) * ((dim - ((X-i)^2)^(1/2)) )^2 * (uint64(BW(i,j) + 1))^2;
+            cumY1 = cumY1 + (j) * ((dim - ((Y-j)^2)^(1/2)))^2 * (uint64(BW(i,j) + 1))^2;
         end
+        
+        totX2 = totX2 + ((dim - ((X-i)^2)^(1/2)) )^2 * (uint64(BW(i,j)+1))^2;
+        totY2 = totY2 + ((dim - ((Y-j)^2)^(1/2)) )^2  * (uint64(BW(i,j)+1))^2;
+        cumX2 = cumX2 + (i) * ((dim - ((X-i)^2)^(1/2)))^2 * (uint64(BW(i,j)+1))^2;
+        cumY2 = cumY2 + (j) * ((dim - ((Y-j)^2)^(1/2)))^2 * (uint64(BW(i,j)+1))^2;
+
     end
 end
-Cx = (cumX/(tot))-1; 
-Cy = (cumY/(tot))-1;
+Cx1 = (cumX1/(totX1)); 
+Cy1 = (cumY1/(totY1));
 
-%{
-Xa = [X(2:end);X(1)];
-Ya = [Y(2:end);Y(1)];
-A = 1/2*sum(X.*Ya-Xa.*Y); %signed area of the polygon
+Cx2 = (cumX2/(totX2)); 
+Cy2 = (cumY2/(totY2));
 
-Cx = (1/(6*A)*sum((X + Xa).*(X.*Ya-Xa.*Y)));
-Cy = (1/(6*A)*sum((Y + Ya).*(X.*Ya-Xa.*Y)));
-%}
+
+Cx = (Cx1+Cx2)/2; 
+Cy = (Cy1+Cy2)/2; 
 
 end
 
 
 function [V,C]=VoronoiBounded(x,y, crs)
 % VORONOIBOUNDED computes the Voronoi cells about the points (x,y) inside
-% the bounding box (a polygon) crs.  If crs is not supplied, an
-% axis-aligned box containing (x,y) is used.
+% the bounding box (a polygon) crs. 
 bnd=[min(x) max(x) min(y) max(y)]; %data bounds
-%{
-if nargin < 3
-    crs=double([bnd(1) bnd(4);bnd(2) bnd(4);bnd(2) bnd(3);bnd(1) bnd(3);bnd(1) bnd(4)]);
-end
-%}
+
 rgx = max(crs(:,1))-min(crs(:,1));
 rgy = max(crs(:,2))-min(crs(:,2));
 rg = max(rgx,rgy);
@@ -102,41 +130,41 @@ V = vi;
 % use Polybool to crop the cells
 %Polybool for restriction of polygons to domain.
 for ij=1:length(C)
-        % thanks to http://www.mathworks.com/matlabcentral/fileexchange/34428-voronoilimit
-        % first convert the contour coordinate to clockwise order:
-        [X2, Y2] = poly2cw(V(C{ij},1),V(C{ij},2));
-        [xb, yb] = polybool('intersection',crs(:,1),crs(:,2),X2,Y2);
-        ix=nan(1,length(xb));
-        for il=1:length(xb)
-            if any(V(:,1)==xb(il)) && any(V(:,2)==yb(il))
-                ix1=find(V(:,1)==xb(il));
-                ix2=find(V(:,2)==yb(il));
-                for ib=1:length(ix1)
-                    if any(ix1(ib)==ix2)
-                        ix(il)=ix1(ib);
-                    end
+    % thanks to http://www.mathworks.com/matlabcentral/fileexchange/34428-voronoilimit
+    % first convert the contour coordinate to clockwise order:
+    [X2, Y2] = poly2cw(V(C{ij},1),V(C{ij},2));
+    [xb, yb] = polybool('intersection',crs(:,1),crs(:,2),X2,Y2);
+    ix=nan(1,length(xb));
+    for il=1:length(xb)
+        if any(V(:,1)==xb(il)) && any(V(:,2)==yb(il))
+            ix1=find(V(:,1)==xb(il));
+            ix2=find(V(:,2)==yb(il));
+            for ib=1:length(ix1)
+                if any(ix1(ib)==ix2)
+                    ix(il)=ix1(ib);
                 end
-                if isnan(ix(il))==1
-                    lv=length(V);
-                    V(lv+1,1)=xb(il);
-                    V(lv+1,2)=yb(il);
-                    ix(il)=lv+1;
-                end
-            else
+            end
+            if isnan(ix(il))==1
                 lv=length(V);
                 V(lv+1,1)=xb(il);
                 V(lv+1,2)=yb(il);
                 ix(il)=lv+1;
             end
+        else
+            lv=length(V);
+            V(lv+1,1)=xb(il);
+            V(lv+1,2)=yb(il);
+            ix(il)=lv+1;
         end
-        C{ij}=ix;
+    end
+    C{ij}=ix;
    
 end
 end
 
 
 
-function [Px, Py] = lloydsAlgorithm(BW,num,dim,Px,Py, crs, numIterations, showPlot)
+function [Px, Py] = lloydsAlgorithm(R,n,dim,Px,Py, crs, numIterations, showPlot,debug)
 % LLOYDSALGORITHM runs Lloyd's algorithm on the particles at xy positions 
 % (Px,Py) within the boundary polygon crs for numIterations iterations
 % showPlot = true will display the results graphically.  
@@ -160,42 +188,6 @@ format compact
 % initialize random generator in repeatable fashion
 sd = 20;
 rng(sd)
-%{
-if nargin < 1   % demo mode
-    showPlot = true;
-    numIterations  = 200;
-    xrange = 10;  %region size
-    yrange = 5;
-    n = 50; %number of robots  (changing the number of robots is interesting)
-% Generate and Place  n stationary robots
-    Px = 0.01*mod(1:n,ceil(sqrt(n)))'*xrange; %start the robots in a small grid
-    Py = 0.01*floor((1:n)/sqrt(n))'*yrange;
-    
-%     Px = 0.1*rand(n,1)*xrange; % place n  robots randomly
-%     Py = 0.1*rand(n,1)*yrange;
-    
-    crs = [ 0, 0;    
-        0, yrange;
-        1/3*xrange, yrange;  % a world with a narrow passage
-        1/3*xrange, 1/4*yrange;
-        2/3*xrange, 1/4*yrange;
-        2/3*xrange, yrange;
-        xrange, yrange;
-        xrange, 0];
-    
-    for i = 1:numel(Px)  
-        while ~inpolygon(Px(i),Py(i),crs(:,1),crs(:,2))% ensure robots are inside the boundary
-            Px(i) = rand(1,1)*xrange; 
-            Py(i) = rand(1,1)*yrange;
-        end
-    end
-else
-    xrange = max(crs(:,1));
-    yrange = max(crs(:,2));
-    n = numel(Px); %number of robots  
-end
-%}
-n = num;
 
 xrange = dim;
 yrange = dim;
@@ -217,15 +209,26 @@ if showPlot
     currHandle = plot(Px,Py,'o','linewidth',2);
     titleHandle = title(['o = Robots, + = Goals, Iteration ', num2str(0)]);
 end
-
-
 %%%%%%%%%%%%%%%%%%%%%%%% END VISUALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % Iteratively Apply LLYOD's Algorithm
 for counter = 1:numIterations
     %[v,c]=VoronoiLimit(Px,Py, crs, false);
     [v,c]=VoronoiBounded(Px,Py, crs);
     
-    if showPlot
+    % Calculate the Delaunay triangulation
+    t = delaunay ( Px, Py );
+    % Display the Delaunay triangulation
+    %{
+    figure(2), clf, hold on;
+    triplot ( t, Px, Py );
+    title_string = sprintf ( 'Delaunay, step %d', counter );
+    title ( title_string );
+    axis equal
+    view ( 2 )
+    %}
+    
+    if showPlot 
         set(currHandle,'XData',Px,'YData',Py);%plot current position
         for i = 1:numel(Px) % color according to
             xD = [get(pathHandle(i),'XData'),Px(i)];
@@ -235,14 +238,28 @@ for counter = 1:numIterations
         end 
     end
     
-    for i = 1:numel(c) %calculate the centroid of each cell
-        [cx,cy] = PolyCentroid(BW,v(c{i},1),v(c{i},2))
-        cx = min(xrange,max(0, cx));
-        cy = min(yrange,max(0, cy));
-        if ~isnan(cx) && inpolygon(uint64(cx),uint64(cy),uint64(crs(:,1)),uint64(crs(:,2)))
-            Px(i) = cx;  %don't update if goal is outside the polygon
-            Py(i) = cy;
+    
+    % Update the figure    
+    C = imread("Density100.png");
+    %imshow(C);
+    BW =rgb2gray(C);
+    %figure,imshow(BW);
+    if(debug)
+        [X,Y] = meshgrid(1:100,1:100);
+        figure(3)
+        surf(X,Y,BW);
+    end
+    
+    for i = 1:n %calculate the centroid of each cell
+        [Cx,Cy] = CoreAlgorithm(BW,i,Px,Py,R,dim);
+        movX = double(int64(Cx)-Px(i));
+        movY = double(int64(Cy)-Py(i));
+        if inpolygon(uint64(Px(i)+movX),uint64(Py(i)+movY),uint64(v(c{i},1)),uint64(v(c{i},2)))
+            Px(i) = Px(i) + movX;
+            Py(i) = Py(i) + movY;
         end
+        %Px(i) = Cx;  %don't update if goal is outside the polygon
+        %Py(i) = Cy;
     end
     
     if showPlot

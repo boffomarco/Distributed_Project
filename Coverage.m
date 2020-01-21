@@ -2,6 +2,16 @@ clear all;
 clc;
 
 
+C = imread("Density100.png");
+%imshow(C);
+
+BW = rgb2gray(C);
+figure,imshow(BW);
+
+[X,Y] = meshgrid(1:100,1:100)
+surf(X,Y,BW)
+
+%{
 % Set the figure
 %figure(5)
 
@@ -180,3 +190,5 @@ end
 Cx = (cumX/tot)
 Cy = (cumY/tot)
 end
+
+%}
