@@ -1,12 +1,14 @@
 clear all;
 clc;
 
-num = 20;
+num = 100;
 dim = 100;
-R = 50;
-lloydsAlgorithm(R,num, dim, dim*rand(num,1)/10+dim/2,dim*rand(num,1)/10+dim/2, [0,0;0,dim;dim,dim;dim,0], 200, true,false)
+R = 33;
+iterations = 1000;
+lloydsAlgorithm(R,num, dim, dim*rand(num,1),dim*rand(num,1), [0,0;0,dim;dim,dim;dim,0], iterations, true,false)
 
-function [Cx,Cy] = CoreAlgorithm(BW,index,Px,Py,R,dim)
+
+function [Cx,Cy, Rel] = CoreAlgorithm(BW,index,Px,Py,R,dim,Rel)
 
 minX = min(0,Px(index)-R);
 maxX = max(dim,Px(index)+R);
@@ -15,15 +17,20 @@ maxY = max(dim,Py(index)+R);
 
 VorX = [Px(index)];
 VorY = [Py(index)];
+Neighbours = [];
 for z=1:numel(Px)
-    if (((Px(z)-Px(index))^2 + (Py(z)-Py(index))^2)^(1/2) < R) && z ~= index
+    if  ( (Px(z)-Px(index))^2 + (Py(z)-Py(index))^2 ) < R^2  && z ~= index
         VorX = [VorX; Px(z)];
         VorY = [VorY; Py(z)];
+        Neighbours = [Neighbours, z];
     end
 end
+Rel(index).nei = Neighbours;
 
 crs = [minX,minY;minX,maxY;maxX,maxY;maxX,minY];
 [v,c]=VoronoiBounded(VorX,VorY, crs);
+
+expn = 1/5;
 
 cumX = 0;
 totX = 0;
@@ -36,30 +43,29 @@ cumYT = 0;
 totYT = 0;
 for x=minX:1.0:maxX
     for y=minY:1.0:maxY
-        if  uint64(x)>0 &&  uint64(x)<=100 &&  uint64(y)>0 &&  uint64(y)<=dim
+        if  uint64(x)>0 &&  uint64(x)<=100 &&  uint64(y)>0 &&  uint64(y)<=dim && (((Px(index)-x)^2 + (Py(index)-y)^2) < R^2)
             [in,on] = inpolygon(x,y,v(c{1},1),v(c{1},2));                          % Logical Matrix
             inon = in | on;                                          % Combine ‘in’ And ‘on’
             if(inon)
-                if ((Px(index)-x)^2 + (Py(index)-y))^(1/2) < R
-                    totX = totX + ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
-                    totY = totY + ((dim - ((Py(index)-y)^2)^(1/2)))^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
-                    cumX = cumX + (x) * ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
-                    cumY = cumY + (y) * ((dim - ((Py(index)-y)^2)^(1/2)))^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
-                end
-
-                totXT = totXT + ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
-                totYT = totYT + ((dim - ((Py(index)-y)^2)^(1/2)))^2 * uint64(BW(uint64(x),uint64(y))+1)^2;
-                cumXT = cumXT + (x) * ((dim - ((Px(index)-x)^2)^(1/2)) )^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
-                cumYT = cumYT + (y) * ((dim - ((Py(index)-y)^2)^(1/2)))^2 * (uint64(BW(uint64(x),uint64(y)) + 1))^2;
+                totX = totX + (double(int16(BW(uint64(x),uint64(y))+1))/256)^(expn);
+                totY = totY + (double(int16(BW(uint64(x),uint64(y))+1))/256)^(expn);
+                cumX = cumX + (x) * (double(int16(BW(uint64(x),uint64(y)) + 1))/256)^(expn);
+                cumY = cumY + (y) * (double(int16(BW(uint64(x),uint64(y)) + 1))/256)^(expn);
             end
+            
+            totXT = totXT + (double(int16(BW(uint64(x),uint64(y))+1))/256)^(expn);
+            totYT = totYT + (double(int16(BW(uint64(x),uint64(y))+1))/256)^(expn);
+            cumXT = cumXT + (x) * (double(int16(BW(uint64(x),uint64(y)) + 1))/256)^(expn);
+            cumYT = cumYT + (y) * (double(int16(BW(uint64(x),uint64(y)) + 1))/256)^(expn);
+
         end
     end
 end
-Cx = (cumX/(totX));
-Cy = (cumY/(totY));
+Cx = (cumX/(totX))*3/2;
+Cy = (cumY/(totY))*3/2;
 
-Cxt = (cumXT/(totXT));
-Cyt = (cumYT/(totYT));
+Cxt = (cumXT/(totXT))*1/2;
+Cyt = (cumYT/(totYT))*1/2;
 
 Cx = (Cx+Cxt)/2;
 Cy = (Cy+Cyt)/2;
@@ -89,7 +95,7 @@ for i=1:1.0:dim
             cumX1 = cumX1 + (i) * ((dim - ((X-i)^2)^(1/2)) )^2 * (uint64(BW(i,j) + 1))^2;
             cumY1 = cumY1 + (j) * ((dim - ((Y-j)^2)^(1/2)))^2 * (uint64(BW(i,j) + 1))^2;
         end
-        
+        % ((R - norm(Px(index)-x))/R ) *
         totX2 = totX2 + ((dim - ((X-i)^2)^(1/2)) )^2 * (uint64(BW(i,j)+1))^2;
         totY2 = totY2 + ((dim - ((Y-j)^2)^(1/2)) )^2  * (uint64(BW(i,j)+1))^2;
         cumX2 = cumX2 + (i) * ((dim - ((X-i)^2)^(1/2)))^2 * (uint64(BW(i,j)+1))^2;
@@ -191,6 +197,8 @@ rng(sd)
 
 xrange = dim;
 yrange = dim;
+
+Rel = struct();
 %%%%%%%%%%%%%%%%%%%%%%%% VISUALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if showPlot
     verCellHandle = zeros(n,1);
@@ -218,15 +226,15 @@ for counter = 1:numIterations
     
     % Calculate the Delaunay triangulation
     t = delaunay ( Px, Py );
-    % Display the Delaunay triangulation
-    %{
-    figure(2), clf, hold on;
-    triplot ( t, Px, Py );
-    title_string = sprintf ( 'Delaunay, step %d', counter );
-    title ( title_string );
-    axis equal
-    view ( 2 )
-    %}
+    if(debug)
+        % Display the Delaunay triangulation
+        figure(2), clf, hold on;
+        triplot ( t, Px, Py );
+        title_string = sprintf ( 'Delaunay, step %d', counter );
+        title ( title_string );
+        axis equal
+        %view ( 2 )
+    end
     
     if showPlot 
         set(currHandle,'XData',Px,'YData',Py);%plot current position
@@ -242,8 +250,8 @@ for counter = 1:numIterations
     % Update the figure    
     C = imread("Density100.png");
     %imshow(C);
-    BW =rgb2gray(C);
-    %figure,imshow(BW);
+    BW =flipud(rgb2gray(C))';
+    %figure,imshow(rgb2gray(C));
     if(debug)
         [X,Y] = meshgrid(1:100,1:100);
         figure(3)
@@ -251,17 +259,60 @@ for counter = 1:numIterations
     end
     
     for i = 1:n %calculate the centroid of each cell
-        [Cx,Cy] = CoreAlgorithm(BW,i,Px,Py,R,dim);
-        movX = double(int64(Cx)-Px(i));
-        movY = double(int64(Cy)-Py(i));
-        if inpolygon(uint64(Px(i)+movX),uint64(Py(i)+movY),uint64(v(c{i},1)),uint64(v(c{i},2)))
-            Px(i) = Px(i) + movX;
-            Py(i) = Py(i) + movY;
+        if(rand() > 0.5)% Randomly update position of robots
+            [Cx,Cy, Rel] = CoreAlgorithm(BW,i,Px,Py,R,dim, Rel);
+            % Normalize movement
+            if( double(int64(Cx)-Px(i)) > 1)
+                movX = 1;
+            else
+                if( double(int64(Cx)-Px(i)) < -1)
+                    movX = -1;
+                else
+                    movX = double(int64(Cx)-Px(i));
+                end
+            end
+            if( double(int64(Cy)-Py(i)) > 1)
+                movY = 1;
+            else
+                if( double(int64(Cy)-Py(i)) < -1)
+                    movY = -1;
+                else
+                    movY = double(int64(Cy)-Py(i));
+                end
+            end
+            
+            %movX = double(int64(Cx)-Px(i));
+            %movY = double(int64(Cy)-Py(i));
+            %don't update if goal is outside the polygon
+            if inpolygon(uint64(Px(i)+movX),uint64(Py(i)+movY),uint64(v(c{i},1)),uint64(v(c{i},2)))
+                Px(i) = Px(i) + movX;
+                Py(i) = Py(i) + movY;
+            end
+            %Px(i) = Cx;  
+            %Py(i) = Cy;
         end
-        %Px(i) = Cx;  %don't update if goal is outside the polygon
-        %Py(i) = Cy;
     end
     
+    Xi = [];
+    Yi = [];
+    figure(3), clf, hold on;
+    image('CData',flipud(rgb2gray(C)),'XData',[0 dim],'YData',[0 dim])
+    hold on
+    for i=1:numel(Rel)
+        if isfield(Rel(i),'nei')
+            for j=1:numel(Rel(i).nei)
+                Xi = [Xi Px(i) Px(Rel(i).nei(j)) NaN];
+                Yi = [Yi Py(i)  Py(Rel(i).nei(j)) NaN];
+            end
+        end
+    end
+    plot(Xi',Yi');
+    for i=1:n
+        plot(Px(i),Py(i),'g*')
+        viscircles([Px(i) Py(i)],R,'LineWidth',0.05);
+    end
+    Rel = struct();
+
     if showPlot
         for i = 1:numel(c) % update Voronoi cells
             set(verCellHandle(i), 'XData',v(c{i},1),'YData',v(c{i},2));
@@ -279,7 +330,8 @@ for counter = 1:numIterations
          end
         %}
     end
-    
 end
-
+figure(4)
+[X,Y] = meshgrid(1:100,1:100);
+surf(X,Y,flipud(rgb2gray(C)));
 end
