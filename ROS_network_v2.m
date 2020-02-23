@@ -1,6 +1,12 @@
-%% VARIABLES
-N = 10; %number of robots
 
+clear all
+%% VARIABLES
+%declare
+global abs_value; % Nx2 array, being the absolute position of each robot expressed in 2D coord (x,y)
+global mat_fig; %Figure to be covered by the robots (matrix form)
+%define
+N = 3; %number of robots
+abs_value = zeros(N,2);
 
 
 %% ROS NETWORK SETUP
@@ -9,7 +15,6 @@ N = 10; %number of robots
 if not(ros.internal.Global.isNodeActive)     
     rosinit
 end
-%clear all
 
 % Topics and message types
 %---------------------------------------
@@ -17,9 +22,8 @@ end
 abs_value_topic = '/abs_value';
 abs_value_msgs_type = 'geometry_msgs/Point';
 %source: http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html
-%http://docs.ros.org/api/sensor_msgs/html/msg/Image.html
 figure_topic = '/figure_image';
-figure_msgs_type = 'std_msgs/String';
+figure_msgs_type = 'nav_msgs/OccupancyGrid';
 
 %List of robot nodes to be registered
 %--------------------------------------
@@ -47,8 +51,8 @@ if(length(reg_nodelist)==1) %check if no node has been register(apart from globa
         %Create publishers
         eval(sprintf('pub_abs_%d = ros.Publisher(robot_node_%d,abs_value_topic,abs_value_msgs_type)', i, i));
         %Create subscribers
-        eval(sprintf('sub_abs_%d = ros.Subscriber(robot_node_%d,abs_value_topic,abs_value_msgs_type)', i, i));
-        eval(sprintf('sub_fig_%d = ros.Subscriber(robot_node_%d,figure_topic,figure_msgs_type)', i, i));
+        eval(sprintf('sub_abs_%d = ros.Subscriber(robot_node_%d,abs_value_topic,abs_value_msgs_type,@newAbsCallback)', i, i));
+        eval(sprintf('sub_fig_%d = ros.Subscriber(robot_node_%d,figure_topic,figure_msgs_type,@newFigCallback)', i, i));
     end    
 else    
     for i = 1:length(unreg_nodelist)
@@ -65,8 +69,8 @@ else
             %Create publishers
             eval(sprintf('pub_abs_%d = ros.Publisher(robot_node_%d,abs_value_topic,abs_value_msgs_type)', i, i));
             %Create subscribers
-            eval(sprintf('sub_abs_%d = ros.Subscriber(robot_node_%d,abs_value_topic,abs_value_msgs_type)', i, i));
-            eval(sprintf('sub_fig_%d = ros.Subscriber(robot_node_%d,figure_topic,figure_msgs_type)', i, i));
+            eval(sprintf('sub_abs_%d = ros.Subscriber(robot_node_%d,abs_value_topic,abs_value_msgs_type,@newAbsCallback)', i, i));
+            eval(sprintf('sub_fig_%d = ros.Subscriber(robot_node_%d,figure_topic,figure_msgs_type,@newFigCallback)', i, i));
         end 
         register = false; %reset flag
     end
@@ -75,30 +79,64 @@ end
 % Print ROS network
 rosnode("list")
 
-%% SEND & RECEIVE MESSAGES (EXAMPLE)
-% Update figure image
-msg_fig = rosmessage(figure_msgs_type);
-msg_fig.Data = 'Figure_image';
 
-%Send figure to topic 
+
+%% SEND & RECEIVE MESSAGES (EXAMPLE)
+
+%Update figure image
+%--------------------------------------
+%Load image
+mat_img = imread("Density100.png");
+%Convert to occupancy map
+map = createOccupancyGrid(mat_img);
+%show(map)
+%Write msg
+msg_fig = rosmessage(figure_msgs_type);
+writeOccupancyGrid(msg_fig,map)
+%Send figure 
 send(pub_figure,msg_fig) % Sent from figure node
 pause(1) % Wait for message to update
 
-%Retrieve figure
-sub_fig_1.LatestMessage.Data
-sub_fig_2.LatestMessage.Data
-sub_fig_3.LatestMessage.Data
 
+%Absolute position update
+%------------------------------------------------
 %Send absolute position value
-msg_abs_val = rosmessage(abs_value_msgs_type);
+msg_abs_val = rosmessage(abs_value_msgs_type); %message format
 
+%Robot 1 sending absolute position
+msg_abs_val.Z = 1; %robot id
 msg_abs_val.X = 12;
 msg_abs_val.Y = 21;
 send(pub_abs_1,msg_abs_val)
 pause(1) % Wait for message to update
 
-%Retrieve abs position
-% sub_abs_2.LatestMessage.Y
-% sub_abs_3.LatestMessage.Z
+%Robot 2 sending absolute position
+msg_abs_val.Z = 2; %robot id
+msg_abs_val.X = 99;
+msg_abs_val.Y = 99;
+send(pub_abs_2,msg_abs_val)
+pause(1) % Wait for message to update
+
+%Robot 3 sending absolute position
+msg_abs_val.Z = 3; %robot id
+msg_abs_val.X = 33;
+msg_abs_val.Y = 33;
+send(pub_abs_2,msg_abs_val)
+pause(1) % Wait for message to update
+
+
+% Check values (after callback)
+%------------------------------------------------------
+%Result from the callback
+abs_value
+imshow(mat_fig)
+
+
+
+
+
+
+
+
 
 
