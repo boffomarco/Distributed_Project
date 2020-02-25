@@ -4,11 +4,14 @@ clear all
 %declare
 global abs_value_x; % Nx2 array, being the absolute position of each robot expressed in 2D coord (x,y)
 global abs_value_y;
+global counter; 
 global mat_fig; %Figure to be covered by the robots (matrix form)
 %define
 N = 3; %number of robots
 abs_value_x = zeros(N,1);
 abs_value_y = zeros(N,1);
+counter = zeros(N,1);
+pubs_abs_list = zeros(N,1);
 
 
 %% ROS NETWORK SETUP
@@ -20,9 +23,9 @@ end
 
 % Topics and message types
 %---------------------------------------
-%source: http://docs.ros.org/api/geometry_msgs/html/msg/Point.html
+%source: http://docs.ros.org/melodic/api/geometry_msgs/html/msg/PointStamped.html
 abs_value_topic = '/abs_value';
-abs_value_msgs_type = 'geometry_msgs/Point';
+abs_value_msgs_type = 'geometry_msgs/PointStamped';
 %source: http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html
 figure_topic = '/figure_image';
 figure_msgs_type = 'nav_msgs/OccupancyGrid';
@@ -52,6 +55,8 @@ if(length(reg_nodelist)==1) %check if no node has been register(apart from globa
         eval(sprintf('robot_node_%d = ros.Node(unreg_tags{i})', i));
         %Create publishers
         eval(sprintf('pub_abs_%d = ros.Publisher(robot_node_%d,abs_value_topic,abs_value_msgs_type)', i, i));
+        %Save publishers in array
+        eval(sprintf('pub_abs_list(%d) = pub_abs_%d',i,i));
         %Create subscribers
         eval(sprintf('sub_abs_%d = ros.Subscriber(robot_node_%d,abs_value_topic,abs_value_msgs_type,@newAbsCallback)', i, i));
         eval(sprintf('sub_fig_%d = ros.Subscriber(robot_node_%d,figure_topic,figure_msgs_type,@newFigCallback)', i, i));
@@ -70,6 +75,8 @@ else
             eval(sprintf('robot_node_%d = ros.Node(unreg_tags{i})', i));
             %Create publishers
             eval(sprintf('pub_abs_%d = ros.Publisher(robot_node_%d,abs_value_topic,abs_value_msgs_type)', i, i));
+            %Save publishers in array
+            eval(sprintf('pub_abs_list(%d) = pub_abs_%d',i,i));
             %Create subscribers
             eval(sprintf('sub_abs_%d = ros.Subscriber(robot_node_%d,abs_value_topic,abs_value_msgs_type,@newAbsCallback)', i, i));
             eval(sprintf('sub_fig_%d = ros.Subscriber(robot_node_%d,figure_topic,figure_msgs_type,@newFigCallback)', i, i));
@@ -103,27 +110,33 @@ pause(1) % Wait for message to update
 %Absolute position update
 %------------------------------------------------
 %Send absolute position value
-%msg_abs_val = rosmessage(abs_value_msgs_type); %message format
-
-% %Robot 1 sending absolute position
-% msg_abs_val.Z = 1; %robot id
-% msg_abs_val.X = 12;
-% msg_abs_val.Y = 21;
-% send(pub_abs_1,msg_abs_val)
-% pause(1) % Wait for message to update
-% 
 
 %Send value by the means of sendAbsValue function
 X = 12;
 Y = 21;
 ID = 3;
-sendAbsValue(pub_abs_2,abs_value_msgs_type,X,Y,ID);
+sendAbsValue(pub_abs_list,abs_value_msgs_type,X,Y,ID);
+
+
+%Send value by the means of sendAbsValue function
+X = 99;
+Y = 99;
+ID = 1;
+sendAbsValue(pub_abs_list,abs_value_msgs_type,X,Y,ID);
+
+
+%Send value by the means of sendAbsValue function
+X = 32;
+Y = 45;
+ID = 2;
+sendAbsValue(pub_abs_list,abs_value_msgs_type,X,Y,ID);
 
 % Check values (after callback)
 %------------------------------------------------------
 %Result from the callback
 abs_value_x
 abs_value_y
+counter
 imshow(mat_fig)
 
 
