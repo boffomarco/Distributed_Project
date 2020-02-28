@@ -1,7 +1,7 @@
 clear all;
 clc;
 
-num = 100;
+num = 10;
 dim = 100;
 R = 33;
 iterations = 1000;
@@ -30,7 +30,7 @@ Rel(index).nei = Neighbours;
 crs = [minX,minY;minX,maxY;maxX,maxY;maxX,minY];
 [v,c]=VoronoiBounded(VorX,VorY, crs);
 
-expn = 1/5;
+expn = 10;
 
 cumX = 0;
 totX = 0;
@@ -248,7 +248,7 @@ for counter = 1:numIterations
     
     
     % Update the figure    
-    C = imread("Density100.png");
+    C = imread("Density100__.png");
     %imshow(C);
     BW =flipud(rgb2gray(C))';
     %figure,imshow(rgb2gray(C));
