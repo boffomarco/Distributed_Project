@@ -1,10 +1,13 @@
 
-function [Cx,Cy, Rel, Covered] = CoreAlgorithm(BW,index,Px,Py,R,dim,Rel)
+function [Cx,Cy, Rel, CoId] = CoreAlgorithm(iter, BW,index,Px,Py,R,dim,Rel)
 % Set the borders to compute the Voronoi
 minX = max(1,Px(index)-R);
 maxX = min(dim,Px(index)+R);
 minY = max(1,Py(index)-R);
 maxY = min(dim,Py(index)+R);
+
+% Store the original Density function to estimate the Covered Area
+BWOriginal = BW;
 
 % Visualization utils
 Xi = [];
@@ -22,18 +25,22 @@ for z=1:numel(Px)
         distanceImage = bwdist(~circlePixels);
         % Normalize it so that it's 1 in the center.
         distanceImage = distanceImage / max(distanceImage(:));
-        BW = BW - double(distanceImage*255*((R-sqrt(D))/R));
+        %BW = BW - double(distanceImage*255*((R-sqrt(D))/R));
+        BW = BW - double(distanceImage*(R-sqrt(D)));
         
         VorX = [VorX; Px(z)];
         VorY = [VorY; Py(z)];
         Neighbours = [Neighbours, z];
         
-        
-        Xi = [Xi; Px(index); Px(z); NaN ];
-        Yi = [Yi; Py(index); Py(z); NaN ];
+        % Show the density function affected by the neighbours
+        if(index == 1)
+            Xi = [Xi; Px(index); Px(z); NaN ];
+            Yi = [Yi; Py(index); Py(z); NaN ];
+        end
     end
 end
 Rel(index).nei = Neighbours;
+BW = max(BW,0.0); % Remove negative values
 
 % Calculate the Voronoi partition taking into account the neighbours
 crs = [minX,minY;minX,maxY;maxX,maxY;maxX,minY];
@@ -49,52 +56,60 @@ if(index == 1)
     plot(Xi,Yi);
 end
 
-expn = (2 * ( numel(Neighbours) + 1)) ^2;
-%expn = 2;
+% Decreasing exponential when the number of Neighbours increases
+expn = 2 * ( sqrt(numel(Neighbours)+1)/(numel(Neighbours)+1) + 1);
+% Start the first 50 iterations to just cover homogeneusly the area, 
+% then cover the density image
+if(iter < 50)
+    expn = 1 / expn;
+end
 
 % Initialise the parameter to calculate the covered density area
-Covered = 0;
+CoId = 0;
 % Initialise the parameters to compute the density function inside the
 % voronoi partition
+cumXV = 0;
+totXV = 0;
+cumYV = 0;
+totYV = 0;
+% Initialise the parameters to compute the density function inside the
+% whole circle
 cumX = 0;
 totX = 0;
 cumY = 0;
 totY = 0;
-% Initialise the parameters to compute the density function inside the
-% whole circle
-cumXT = 0;
-totXT = 0;
-cumYT = 0;
-totYT = 0;
 for x=minX:1.0:maxX
     for y=minY:1.0:maxY
         if (sqrt((Px(index)-x)^2 + (Py(index)-y)^2) <= R)
             [in,on] = inpolygon(x,y,v(c{1},1),v(c{1},2));                          % Logical Matrix
             inon = in | on;                                          % Combine ‘in’ And ‘on’
             if(inon)
-                totX = totX + (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
-                totY = totY + (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
-                cumX = cumX + (x)  * (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
-                cumY = cumY + (y)  * (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
+                
+                totXV = totXV + (double(int16(BWOriginal(uint64(x),uint64(y)))+1)/256)^(expn);
+                totYV = totYV + (double(int16(BWOriginal(uint64(x),uint64(y)))+1)/256)^(expn);
+                cumXV = cumXV + (x)  * (double(int16(BWOriginal(uint64(x),uint64(y)))+1)/256)^(expn);
+                cumYV = cumYV + (y)  * (double(int16(BWOriginal(uint64(x),uint64(y)))+1)/256)^(expn);
+                
             end
             
-            totXT = totXT + (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
-            totYT = totYT + (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
-            cumXT = cumXT + (x) * (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
-            cumYT = cumYT + (y) * (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
+            totX = totX + (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
+            totY = totY + (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
+            cumX = cumX + (x) * (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
+            cumY = cumY + (y) * (double(int16(BW(uint64(x),uint64(y)))+1)/256)^(expn);
             
-            Covered = Covered + double(int16(BW(uint64(x),uint64(y))));
+            CoId = CoId + double(int16(BWOriginal(uint64(x),uint64(y))));
         end
     end
 end
 
+CxV = (cumXV/(totXV));
+CyV = (cumYV/(totYV));
+
 Cx = (cumX/(totX));
 Cy = (cumY/(totY));
 
-Cxt = (cumXT/(totXT));
-Cyt = (cumYT/(totYT));
+Cx = (CxV+Cx)/2;
+Cy = (CyV+Cy)/2; 
 
-Cx = (Cx+Cxt)/2;
-Cy = (Cy+Cyt)/2;
 end
 

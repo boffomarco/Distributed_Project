@@ -7,5 +7,5 @@ function sendAbsValue(pub_id_list, msg_type, abs_x,abs_y,robot_id)
     msg_abs_val.Point.Y = abs_y;
     %Send the message
     send(pub_id_list(robot_id),msg_abs_val)
-    pause(1) % Wait for message to update
+    pause(0.5) % Wait for message to update
 end

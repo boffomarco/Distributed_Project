@@ -2,8 +2,7 @@ clear all;
 clc;
 
 % initialize random generator
-sd = 100*rand();
-rng(sd)
+%rng('default')
 
 %% Add the utility's functions folder
 addpath('Utils')
@@ -19,8 +18,11 @@ global mat_fig; % Figure to be covered by the robots (matrix form)
 N = 3; %number of robots
 dim = 100; % Dimension of the picture square to cover
 crs = [0,0;0,dim;dim,dim;dim,0];
-R = 40 + rand(N,1)*10; % Radius of the robots
+R = 35 + rand(N,1)*10; % Radius of the robots
 unCertainity = rand(N,1); % UnCertainty of the sensors on the robots
+Covered = zeros(N,1); % Array used to store the Covered Area of each robot
+TotCovered = []; % List used for the visualization of the total sum of Covered Area
+StdCovered = []; % List used for the visualization of the std of Covered Area
 iterations = 100; % Number of executions of the algorithm
 step = 1; % Maximum distance that a robot can move in a direction
 
@@ -137,9 +139,6 @@ end
 % End Visualization
 
 %% Iterations
-% N array used to get the covered area
-Covered = zeros(N,1);
-TotCovered = [];
 % For loop to iterate the algorithm
 for iter = 1:iterations
     %[v,c]=VoronoiLimit(abs_value_x,abs_value_y, crs, false);
@@ -198,14 +197,14 @@ for iter = 1:iterations
     writeOccupancyGrid(msg_fig,map)
     %Send figure 
     send(pub_figure,msg_fig) % Sent from figure node
-    pause(1) % Wait for message to update
+    pause(0.5) % Wait for message to update
 
 
     %% Iteration for each robot
     Rel = struct();
     for i = 1:N
-        if(rand() < 0.9)% Randomly update position of robots
-            [Cx,Cy, Rel, Covered(i)] = CoreAlgorithm(mat_fig, i, abs_value_x, abs_value_y, R(i), dim, Rel);
+        if(rand() < 2)% Randomly update position of robots
+            [Cx,Cy, Rel, Covered(i)] = CoreAlgorithm(iter, mat_fig, i, abs_value_x, abs_value_y, R(i), dim, Rel);
             % Normalize movement
             if( double(int64(Cx)-abs_value_x(i)) > step)
                 movX = step;
@@ -235,15 +234,21 @@ for iter = 1:iterations
     % End Iterations on the Robots
     
     %% Visualize Fitness value    
-    tempCovered = 0;
-    for i = 1:N % Sum the coverage of each cell
-        tempCovered = tempCovered + Covered(i);
+    tempTotCovered = 0;
+    for i = 1:N 
+        tempTotCovered = tempTotCovered + Covered(i); % Summation
     end
-    TotCovered = [TotCovered tempCovered];
+    TotCovered = [TotCovered tempTotCovered]; % Sum the coverage of each cell
+    StdCovered = [StdCovered  std(Covered)]; % STD of the coverage of every cell
     figure(8), clf, hold on;
-    title_string = sprintf ( 'Coverage at step %d', iter );
+    title_string = sprintf ( 'Coverage & STD at step %d', iter );
     title ( title_string );
+    yyaxis left
+    ylabel('Total Coverage')
     plot(1:iter, TotCovered);
+    yyaxis right
+    ylabel('STD Coverage')
+    plot(1:iter, StdCovered);
     
     %% Print Robots Network
     Xi = [];
