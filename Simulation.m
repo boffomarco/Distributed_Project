@@ -15,22 +15,28 @@ global counter;  % N array, being the counter for each robot position update
 global mat_fig; % Figure to be covered by the robots (matrix form)
 
 %define
-N = 3; %number of robots
+N = 9; %number of robots
 dim = 100; % Dimension of the picture square to cover
-crs = [0,0;0,dim;dim,dim;dim,0];
-R = 35 + rand(N,1)*10; % Radius of the robots
-unCertainity = rand(N,1); % UnCertainty of the sensors on the robots
+crs = [0,0;0,dim;dim,dim;dim,0]; % Polygon area definition
+R = 25 + rand(N,1)*10; % Radius of the robots
+
+%unCertainity = rand(N,1); % UnCertainty of the sensors on the robots
 Covered = zeros(N,1); % Array used to store the Covered Area of each robot
 TotCovered = []; % List used for the visualization of the total sum of Covered Area
 StdCovered = []; % List used for the visualization of the std of Covered Area
-iterations = 100; % Number of executions of the algorithm
-step = 1; % Maximum distance that a robot can move in a direction
+iterations = 10000; % Number of executions of the algorithm
+iter_tmp = 0; % store number of step to reach convergence for each image
+% May include the name of the file inside images folder (equal to end_image to stop there)
+image_i = 0; % Incremental to change image
+end_image = 1; % Set number for final image +1 (>1 to test "moving images")
+step = 0.7; % Maximum distance that a robot can move in a direction, 0.7 so to have maximum length of 1
 
-abs_value_x = dim*rand(N,1);
-abs_value_y = dim*rand(N,1);
+abs_value_x = dim * rand(N,1)% Initial values of the robots
+abs_value_y = dim * rand(N,1)% Initial values of the robots
 counter = zeros(N,1);
 pubs_abs_list = zeros(N,1);
 
+% Debug variables
 showPlot = true;
 debug = false;
 
@@ -109,8 +115,8 @@ end
 % Print ROS network
 rosnode("list")
 
-%% Simulation 
-%Simulation(R, N, dim, dim*rand(N,1), dim*rand(N,1), [0,0;0,dim;dim,dim;dim,0], iterations, true, false)
+
+%% Visualization of initial points and Voronoi
 
 close all
 format compact
@@ -118,7 +124,6 @@ format compact
 xrange = dim;
 yrange = dim;
 
-%% Visualization
 if showPlot
     verCellHandle = zeros(N,1);
     cellColors = cool(N);
@@ -162,7 +167,7 @@ for iter = 1:iterations
         for i = 1:numel(abs_value_x) % color according to
             xD = [get(pathHandle(i),'XData'),abs_value_x(i)];
             yD = [get(pathHandle(i),'YData'),abs_value_y(i)];
-            set(pathHandle(i),'XData',xD,'YData',yD);%plot path position
+            set(pathHandle(i),'XData',xD,'YData',yD, 'linewidth',2);%plot path position
      %       set(numHandle(i),'Position',[ abs_value_x(i),abs_value_y(i)]);
         end 
     end
@@ -185,8 +190,9 @@ for iter = 1:iterations
     end
     %}
     %--------------------------------------
-    %Load image
-    img = imread(strcat('Density',int2str(dim),'.png'));
+    % Load image
+    %img = imread(strcat('Density',int2str(dim),'.png'));
+    img = imread(strcat('images/',int2str(image_i),'.png')); 
     mat_img = flipud(rgb2gray(img))';
     %imshow(mat_img)
     %Convert to occupancy map
@@ -213,6 +219,7 @@ for iter = 1:iterations
                     movX = - step;
                 else
                     movX = double(int64(Cx)-abs_value_x(i));
+                    %movX = 0; % To avoid too many oscillations
                 end
             end
             if( double(int64(Cy)-abs_value_y(i)) > step)
@@ -222,6 +229,7 @@ for iter = 1:iterations
                     movY = - step;
                 else
                     movY = double(int64(Cy)-abs_value_y(i));
+                    %movY = 0; % To avoid too many oscillations
                 end
             end
             
@@ -233,7 +241,7 @@ for iter = 1:iterations
     end
     % End Iterations on the Robots
     
-    %% Visualize Fitness value    
+    %% Visualize Fitness values    
     tempTotCovered = 0;
     for i = 1:N 
         tempTotCovered = tempTotCovered + Covered(i); % Summation
@@ -259,20 +267,20 @@ for iter = 1:iterations
     image('CData',mat_fig','XData',[0 dim],'YData',[0 dim])
     hold on
     for i=1:N
-        plot(abs_value_x(i),abs_value_y(i),'w*')
+        plot(abs_value_x(i),abs_value_y(i),'wo','linewidth',2);
         %viscircles([abs_value_x(i) abs_value_y(i)], R(i), 'LineWidth',0.05);
     end
     for i=1:numel(Rel)
         if isfield(Rel(i), 'nei')
-            plot(abs_value_x(i),abs_value_y(i), 'g*')
-            viscircles([abs_value_x(i) abs_value_y(i)], R(i), 'LineWidth', 0.05);
+            plot(abs_value_x(i),abs_value_y(i), 'go','linewidth',2);
+            viscircles([abs_value_x(i) abs_value_y(i)], R(i),'Color','white','LineStyle',':','linewidth',0.1);
             for j=1:numel(Rel(i).nei)
                 Xi = [Xi abs_value_x(i) abs_value_x(Rel(i).nei(j)) NaN];
                 Yi = [Yi abs_value_y(i)  abs_value_y(Rel(i).nei(j)) NaN];
             end
         end
     end
-    plot(Xi',Yi');
+    plot(Xi',Yi', 'k', 'linewidth', 1);
     
     %% Show Voronoi Visualization
     if showPlot
@@ -292,6 +300,18 @@ for iter = 1:iterations
          end
         %}
     end
+    
+    %% End of computation in case of more than 100 steps or static image (count 2 near values in case of oscillation) (leave 2 steps to be sure)
+    if((iter - iter_tmp > 100) || (numel(TotCovered)> 5 && ((TotCovered(end-4) == tempTotCovered && std(Covered) == StdCovered(end-4)) || (TotCovered(end-3) == tempTotCovered && std(Covered) == StdCovered(end-3)))))
+        disp("Reached converged for image")
+        image_i
+        iter - iter_tmp
+        iter_tmp = iter;
+        image_i = image_i + 1;
+        if(image_i == end_image)
+            break;
+        end
+    end
 end
 % End Iterations
 
@@ -302,9 +322,9 @@ title ( 'Final Density Function in 3D' );
 surf(X, Y, flipud(rgb2gray(img)));
 
 %% Finish
-% Check values 
-abs_value_x
-abs_value_y
-counter
+% To check values 
+abs_value_x;
+abs_value_y;
+counter;
 
 
