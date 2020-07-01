@@ -21,6 +21,7 @@ crs = [0,0;0,dim;dim,dim;dim,0]; % Polygon area definition
 R = 25 + rand(N,1)*10; % Radius of the robots
 
 %unCertainity = rand(N,1); % UnCertainty of the sensors on the robots
+asynchronous = 0.9; % Set to ensure the asynchronousity of the algorithm
 Covered = zeros(N,1); % Array used to store the Covered Area of each robot
 TotCovered = []; % List used for the visualization of the total sum of Covered Area
 StdCovered = []; % List used for the visualization of the std of Covered Area
@@ -209,7 +210,7 @@ for iter = 1:iterations
     %% Iteration for each robot
     Rel = struct();
     for i = 1:N
-        if(rand() < 2)% Randomly update position of robots
+        if(rand() < asynchronous)% Randomly update position of robots
             [Cx,Cy, Rel, Covered(i)] = CoreAlgorithm(iter, mat_fig, i, abs_value_x, abs_value_y, R(i), dim, Rel);
             % Normalize movement
             if( double(int64(Cx)-abs_value_x(i)) > step)
