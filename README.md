@@ -5,6 +5,8 @@ Hybrid algorithm for distributing groups of robots.
 Our approach allows to distribute them homogeneously on an area characterised by a variable density function. 
 The focus is on autonomous agents either able to perform sensing tasks or able to receive a desired configuration.
 
+The report is viewable [here](https://www.overleaf.com/read/dbcvtpjtrzcf)
+
 ## Simulation
 
  - Open ```Simulation.m``` with MatLab
