@@ -5,6 +5,12 @@ Hybrid algorithm for distributing groups of robots.
 Our approach allows to distribute them homogeneously on an area characterised by a variable density function. 
 The focus is on autonomous agents either able to perform sensing tasks or able to receive a desired configuration.
 
+This report presents a hybrid algorithm for distributing groups of robots. 
+Our approach allows to distribute them homogeneously on an area characterised by a variable density function. 
+The focus is on autonomous agents either able to perform sensing tasks or able to receive the desired configuration.
+The report proposes a hybrid algorithm for their correct distribution on the area providing a point to point output for them to move.
+The resulting algorithm is adaptive, distributed, and asynchronous.
+
 The report is viewable [here](https://www.overleaf.com/read/dbcvtpjtrzcf)
 
 ## Simulation
